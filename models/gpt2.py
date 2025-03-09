@@ -1,4 +1,5 @@
 from transformers.models.gpt2.modeling_gpt2 import GPT2PreTrainedModel, GPT2Model
+from transformers.models.gpt2.configuration_gpt2 import GPT2Config
 from transformers import GenerationMixin
 from transformers.utils import (
     ModelOutput,
@@ -21,18 +22,52 @@ import torch.nn as nn
 from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 import torch.nn.functional as F
 from typing import Callable, Optional, Tuple, Union
+import os
+import json
+
+
+class HLMGPT2Config(GPT2Config):
+    model_type = "hlmgpt2"
+    keys_to_ignore_at_inference = ["past_key_values"]
+    attribute_map = {
+        "hidden_size": "n_embd",
+        "max_position_embeddings": "n_positions",
+        "num_attention_heads": "n_head",
+        "num_hidden_layers": "n_layer",
+    }
+
+    def __init__(
+        self,
+        gpt2config=None,
+        model_name_or_path='gpt2',
+        vq_config=None,
+        **kwargs,
+    ):
+        if gpt2config is not None:
+            gpt2config = gpt2config.to_dict()
+        else:
+            gpt2config = {}
+        super().__init__(**gpt2config)
+        self.model_name_or_path = model_name_or_path
+        if vq_config is None:
+            vq_config = {}
+        self.codebook_dim = vq_config.get('codebook_dim', 512)
+        self.codebook_size = vq_config.get('codebook_size', 64)
+        self.embedding_dim = vq_config.get('embedding_dim', 768)
+        self.num_quantizer = vq_config.get('num_quantizers', 4)
+
 
 
 class HLMGPT2(GPT2PreTrainedModel, GenerationMixin):
-    _tied_weights_keys = ["lm_head.weight"]
+    _tied_weights_keys = []
 
-    def __init__(self, gpt2_config, model_name_or_path, vq_config):
-        super().__init__(gpt2_config)
-        self.transformer = GPT2Model(gpt2_config).from_pretrained(model_name_or_path)
-        self.codebook_dim = vq_config['codebook_dim']
-        self.embedding_dim = vq_config['embedding_dim']
-        self.codebook_size = vq_config['codebook_size']
-        self.num_quantizer = vq_config['num_quantizers']
+    def __init__(self, config):
+        super().__init__(config)
+        self.transformer = GPT2Model(config).from_pretrained(config.model_name_or_path)
+        self.codebook_dim = config.codebook_dim
+        self.embedding_dim = config.embedding_dim
+        self.codebook_size = config.codebook_size
+        self.num_quantizer = config.num_quantizer
         self.wte = torch.nn.Sequential(*[torch.nn.Embedding(self.codebook_size, self.embedding_dim) for _ in range(self.num_quantizer)])
         # model.wte_proj = torch.nn.Linear(self.codebook_dim, self.embedding_dim)
         self.vqhead = torch.nn.Sequential(*[torch.nn.Linear(self.embedding_dim, self.codebook_size) for _ in range(self.num_quantizer)])
@@ -46,19 +81,6 @@ class HLMGPT2(GPT2PreTrainedModel, GenerationMixin):
 
         # Initialize weights and apply final processing
         # self.post_init()
-
-    # def to(self, device):
-    #     self.transformer.to(device)
-    #     self.wte = [w.to(device) for w in self.wte]
-    #     self.vqhead = [v.to(device) for v in self.vqhead]
-    #     self.model_parallel = device.type == "cuda"
-    #     self.device_map = get_device_map(len(self.transformer.h), range(torch.cuda.device_count()))
-    #     self.is_parallelizable = True
-    #     self.transformer.model_parallel = self.model_parallel
-    #     # self.transformer.half() if device.type == "cuda" else self.transformer.float()
-
-    # def parameters(self, recurse = True):
-    #     return super().parameters(recurse)
 
     def parallelize(self, device_map=None):
         self.device_map = (
@@ -155,7 +177,7 @@ class HLMGPT2(GPT2PreTrainedModel, GenerationMixin):
                 loss = F.cross_entropy(lm_logits[-1].view(-1, lm_logits[-1].shape[-1]), labels[:,:,i].view(-1).long(), ignore_index=-100)
             else:
                 loss += F.cross_entropy(lm_logits[-1].view(-1, lm_logits[-1].shape[-1]), labels[:,:,i].view(-1).long(), ignore_index=-100)
-        loss = loss / self.num_quantizer
+        # loss = loss / self.num_quantizer
         lm_logits = lm_logits[-1] # avoid too much memory usage
         if not return_dict:
             output = (lm_logits,) + transformer_outputs[1:]
@@ -183,3 +205,13 @@ class HLMGPT2(GPT2PreTrainedModel, GenerationMixin):
             tuple(past_state.index_select(0, beam_idx.to(past_state.device)) for past_state in layer_past)
             for layer_past in past_key_values
         )
+    
+    @staticmethod
+    def load_checkpoint(model, ckpt_dir):
+        assert isinstance(model, HLMGPT2)
+        # load model.safetensors
+        model.load_state_dict(torch.load(os.path.join(ckpt_dir,'model.safetensors')))
+
+    def tie_weights(self):
+        return
+    

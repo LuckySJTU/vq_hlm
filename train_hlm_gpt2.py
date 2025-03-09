@@ -1,8 +1,9 @@
 import os
+import sys
 import argparse
 from transformers import AutoConfig, Trainer, TrainingArguments, pipeline
 from datasets import load_dataset
-from models.gpt2 import HLMGPT2
+from models.gpt2 import HLMGPT2, HLMGPT2Config
 from utils import load_config
 import torch
 import torch.nn.functional as F
@@ -15,6 +16,7 @@ logging.basicConfig(
 
 # 1. 加载数据集
 def load_data(prefix):
+    logging.info(f'Dataset from {prefix}')
     dataset = load_dataset(os.path.join(prefix, 'htoken.py'),trust_remote_code=True, cache_dir=prefix)
     return dataset
 
@@ -22,7 +24,8 @@ def load_data(prefix):
 def load_model(model_name="gpt2", model_config_path='conf/model_config.yaml'):
     gpt2_config = AutoConfig.from_pretrained(model_name)
     vq_config = load_config(model_config_path)
-    model = HLMGPT2(gpt2_config, model_name, vq_config)
+    hlmgpt2_config = HLMGPT2Config(gpt2_config, model_name, vq_config)
+    model = HLMGPT2(hlmgpt2_config)
     return model
 
 # 3. 数据预处理：tokenize数据集
@@ -65,7 +68,7 @@ def configure_training(model, train_config, train_dataset, val_dataset):
 # 5. 训练模型
 def train_model(trainer):
     trainer.train()
-    trainer.eval()
+    trainer.evaluate()
 
 # 6. 保存模型
 def save_model(model):
@@ -86,6 +89,7 @@ def main():
     parser.add_argument("--model_name_or_path", default="/data1/public/hf/openai-community/gpt2", help='Path to gpt2 model')
     parser.add_argument("--train_config", default=None, help="Path to your train config file. If not specified, will be `vq_dir/train_config.yaml`. At least one of --vq_dir or --train_config is required.")
     parser.add_argument("--output_dir", default=None, help='Path to save model and logs. If not specified, will be `vq_dir_hlm`.')
+    parser.add_argument("--ckpt_dir", default=None, help='Path to load model for test. If not specified, will use `--output_dir`')
     parser.add_argument("--test", action='store_true', help='Whether to run in test mode.')
     args = parser.parse_args()
 
@@ -101,13 +105,14 @@ def main():
     if args.vq_model is None:
         args.vq_model = os.path.join(args.vq_dir, 'best_checkpoint.pt')
     if args.output_dir is None:
-        args.output_dir = args.vq_dir.strip('/')+'_hlm'
+        args.output_dir = args.vq_dir
     assert os.path.exists(args.data_config), 'Please check your data_config file path'
     assert os.path.exists(args.model_config), 'Please check your model_config file path'
-    assert os.path.exists(args.vq_model), 'Please check your vq_model file path'
+    # this parameter is not used in this script
+    # assert os.path.exists(args.vq_model), 'Please check your vq_model file path'
     assert os.path.exists(args.train_config), 'Please check your train_config file path'
     if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+        os.makedirs(args.output_dir, exist_ok=True)
         logging.info(f'Creating output directory {args.output_dir}')
     else:
         logging.warning(f"Output directory {args.output_dir} already exists. May overwrite the existing files.")
@@ -140,14 +145,20 @@ def main():
         train_config['logging_dir'] = train_config['output_dir']
     trainer = configure_training(model, train_config, train_dataset, val_dataset)
     
-    # 5. 训练模型
-    logging.info('Training model...')
-    train_model(trainer)
+    if not args.test:
+        # 5. 训练模型
+        logging.info('Training model...')
+        train_model(trainer)
     
-    # 6. 保存模型
-    logging.info('Saving model...')
-    save_model(model)
+        # 6. 保存模型
+        logging.info('Saving model...')
+        model.save_pretrained(args.output_dir)
     
+    logging.info('Testing model...')
+    model = HLMGPT2.from_pretrained(args.ckpt_dir if args.ckpt_dir is not None else args.output_dir)
+    eval_metric = trainer.evaluate(test_dataset, metric_key_prefix='test')
+    logging.info(f'Test metric: {eval_metric}')
+
     # 7. 生成文本
     logging.info('Generating text')
     # TODO
