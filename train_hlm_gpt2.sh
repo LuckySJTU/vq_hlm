@@ -16,4 +16,4 @@ OUTPUT_DIR=./exp/$RUN_NAME
 # | tee $OUTPUT_DIR/train.log
 torchrun --nproc_per_node=4 train_hlm_gpt2.py \
 --vq_dir $OUTPUT_DIR \
-| tee ${OUTPUT_DIR}/trainhlm.log
+2>&1 | tee $OUTPUT_DIR/trainhlm.log

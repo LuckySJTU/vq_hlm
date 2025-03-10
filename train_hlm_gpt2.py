@@ -71,8 +71,8 @@ def train_model(trainer):
     trainer.evaluate()
 
 # 6. 保存模型
-def save_model(model):
-    model.save_pretrained("./gpt2_finetuned")
+# def save_model(model):
+#     model.save_pretrained("./gpt2_finetuned")
 
 # 7. 生成文本
 def generate_text(tokenizer):
