@@ -8,4 +8,4 @@ OUTPUT_DIR=./exp/$RUN_NAME
 python train_hlm_gpt2.py \
 --vq_dir $OUTPUT_DIR \
 --test \
-2>&1 | tee $OUTPUT_DIR/testhlm.log
+2>&1 | tee -a $OUTPUT_DIR/testhlm.log

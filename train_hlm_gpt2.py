@@ -3,11 +3,13 @@ import sys
 import argparse
 from transformers import AutoConfig, Trainer, TrainingArguments, pipeline
 from datasets import load_dataset
-from models.gpt2 import HLMGPT2, HLMGPT2Config
+from models import HLMGPT2, HLMGPT2Config
 from utils import load_config
 import torch
 import torch.nn.functional as F
 import logging
+from tqdm import tqdm
+import math
 
 logging.basicConfig(
     level=logging.INFO,
@@ -130,6 +132,8 @@ def main():
     logging.info('Loading gpt2 model...')
     model_name = args.model_name_or_path
     model = load_model(model_name, model_config_path=args.model_config)
+
+    NUM_QUANTIZER = load_config(args.model_config)['num_quantizers']
     
     # 3. 数据预处理
     logging.info('Tokenizing data')
@@ -154,16 +158,41 @@ def main():
         logging.info('Saving model...')
         model.save_pretrained(args.output_dir)
     
+    # 7. 测试模型
     logging.info('Testing model...')
     model = HLMGPT2.from_pretrained(args.ckpt_dir if args.ckpt_dir is not None else args.output_dir)
     eval_metric = trainer.evaluate(test_dataset, metric_key_prefix='test')
     logging.info(f'Test metric: {eval_metric}')
+    logging.info(f"Test loss: {eval_metric['test_loss']}")
+    logging.info(f"Test loss per codebook: {eval_metric['test_loss']/NUM_QUANTIZER:.4f}")
+    logging.info(f"Test ppl: {math.exp(eval_metric['test_loss']/NUM_QUANTIZER):.4f}")
 
-    # 7. 生成文本
-    logging.info('Generating text')
-    # TODO
-    # 这个还没写，啥时候有空了再补:p
-    # generate_text(tokenizer)
+    # 8. 其他测试标准，--test only
+    DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
+    if args.test:
+        logging.info("Validation for other metrics...")
+        model.to(DEVICE)
+        model.eval()
+        with torch.no_grad():
+            correct = [0]*NUM_QUANTIZER
+            total = [0]*NUM_QUANTIZER
+            for batch in tqdm(test_dataset):
+                # labels: 1*1024*num_quantizer
+                # output: num_quantizer*(1*1024*codebooksize), list
+                input_ids = torch.tensor(batch['input_ids']).to(DEVICE)
+                input_ids = input_ids.unsqueeze(0)
+                labels = torch.tensor(batch['label']).to(DEVICE)
+                labels = labels.unsqueeze(0)
+                output = model(input_ids=input_ids, labels=labels).logits
+                for i in range(len(output)):
+                    # 计算每个码本的预测准确率
+                    prediction = torch.argmax(output[i], dim=-1).squeeze()
+                    target = labels[0,:,i]
+                    correct[i] += torch.sum(prediction == target).item()
+                    total[i] += target.shape[0]
+        logging.info(f'Codebook prediction accuracy: {sum(correct) / sum(total):.4f}')
+        logging.info(f'Pred acc on each codebook: {[correct[i]/total[i] for i in range(len(correct))]}')
+        logging.info(f"Number of quantizer: {NUM_QUANTIZER}")
 
 if __name__ == "__main__":
     main()

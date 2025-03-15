@@ -1,5 +1,5 @@
-h5_file_path: "/home/yxwang/Dataset/vqhlm/wikitext103_gpt2ln2_stride1024"
-batch_size: 256
+h5_file_path: "/home/yxwang/Dataset/vqhlm/0305_rsimvq_CD512_CS64_CN16_LR1E-3_BS1"
+batch_size: 1
 seq_length: 1024
 hidden_size: 768
-chunk_size: 4
+chunk_size: 1
