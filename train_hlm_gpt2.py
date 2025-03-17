@@ -161,6 +161,7 @@ def main():
     # 7. 测试模型
     logging.info('Testing model...')
     model = HLMGPT2.from_pretrained(args.ckpt_dir if args.ckpt_dir is not None else args.output_dir)
+    trainer = configure_training(model, train_config, train_dataset, val_dataset)
     eval_metric = trainer.evaluate(test_dataset, metric_key_prefix='test')
     logging.info(f'Test metric: {eval_metric}')
     logging.info(f"Test loss: {eval_metric['test_loss']}")
@@ -169,13 +170,15 @@ def main():
 
     # 8. 其他测试标准，--test only
     DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
-    if args.test:
+    # if args.test:
+    if True:
         logging.info("Validation for other metrics...")
         model.to(DEVICE)
         model.eval()
         with torch.no_grad():
             correct = [0]*NUM_QUANTIZER
             total = [0]*NUM_QUANTIZER
+            # losses = []
             for batch in tqdm(test_dataset):
                 # labels: 1*1024*num_quantizer
                 # output: num_quantizer*(1*1024*codebooksize), list
@@ -183,7 +186,10 @@ def main():
                 input_ids = input_ids.unsqueeze(0)
                 labels = torch.tensor(batch['label']).to(DEVICE)
                 labels = labels.unsqueeze(0)
-                output = model(input_ids=input_ids, labels=labels).logits
+                output = model(input_ids=input_ids, labels=labels)
+                # loss = output.loss
+                # losses.append(loss.item())
+                output = output.logits
                 for i in range(len(output)):
                     # 计算每个码本的预测准确率
                     prediction = torch.argmax(output[i], dim=-1).squeeze()
@@ -193,6 +199,7 @@ def main():
         logging.info(f'Codebook prediction accuracy: {sum(correct) / sum(total):.4f}')
         logging.info(f'Pred acc on each codebook: {[correct[i]/total[i] for i in range(len(correct))]}')
         logging.info(f"Number of quantizer: {NUM_QUANTIZER}")
+        # logging.info(f"Test Loss: {sum(losses) / len(losses)}")
 
 if __name__ == "__main__":
     main()
