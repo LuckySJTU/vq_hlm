@@ -233,7 +233,7 @@ if __name__ == '__main__':
     # Test using best checkpoint
     logging.info("Loading best checkpoint for testing")
     load_checkpoint(model, None, os.path.join(args.ckpt_dir, 'best_checkpoint.pt'))
-    _, index_count = evaluate(model, test_dataloader, "Test", writer)
+    eval_ret = evaluate(model, test_dataloader, "Test", writer)
     # save_histogram(args, index_count)
 
     writer.close()

@@ -29,8 +29,8 @@ class MyDataset(GeneratorBasedBuilder):
             if len(input_ids) > len(label):
                 input_ids = input_ids[:len(label)]
             if len(input_ids) < 1024:
-                # input_ids = torch.cat((input_ids, torch.zeros((1024-input_ids.shape[0], input_ids.shape[1]), dtype=input_ids.dtype)))
-                # label = torch.cat((label, torch.zeros((1024-label.shape[0], label.shape[1]), dtype=label.dtype)))
-                input_ids = torch.cat((input_ids, raw_token[:1024-input_ids.shape[0]]))
-                label = torch.cat((label, raw_token[1:1025-label.shape[0]]))
+                input_ids = torch.cat((input_ids, torch.zeros((1024-input_ids.shape[0], input_ids.shape[1]), dtype=input_ids.dtype)))
+                label = torch.cat((label, torch.zeros((1024-label.shape[0], label.shape[1]), dtype=label.dtype)*(-100)))
+                # input_ids = torch.cat((input_ids, raw_token[:1024-input_ids.shape[0]]))
+                # label = torch.cat((label, raw_token[1:1025-label.shape[0]]))
             yield i, {"input_ids": input_ids, "label": label}
