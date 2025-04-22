@@ -88,7 +88,8 @@ if __name__ == '__main__':
     logging.info("Loading best checkpoint for processing")
     load_checkpoint(model, None, os.path.join(args.ckpt_dir, 'best_checkpoint.pt'))
     data_config = config = load_config(args.data_config)
-    save_dir = data_config['h5_file_path']
+    # save_dir = data_config['h5_file_path']
+    save_dir = '/home/yxwang/Dataset/vqhlm/0416_rsimvq_CN16_CS1024_LR1E-3_BS1'
 
     logging.info("Preparing train tokens")
     train_tokens = prepare_token(model, train_dataloader, save_dir)
