@@ -2,7 +2,7 @@
 
 set -x
 
-RUN_NAME=0311_hlm_bs1024_lr1e-3
+RUN_NAME=0322_rsimvq_CD512_CS16_CN64_LR1E-3_BS1
 MODEL_CONFIG_DIR=./conf/models/residualsimvq.yaml
 DATA_CONFIG_DIR=./conf/data/example.yaml
 TRAIN_CONFIG_DIR=./conf/hlm_train/train_config.yaml

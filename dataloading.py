@@ -54,7 +54,7 @@ class ChunkedHDF5Dataset(HDF5Dataset):
 
 def get_chunked_h5dataloader(config_path, split, shuffle=None):
     config = load_config(config_path=config_path)
-    num_workers = 2  # Set num workers to 0 to enable debugging
+    num_workers = 8  # Set num workers to 0 to enable debugging
     if shuffle is None:
         shuffle = split == 'train'
     dataset = ChunkedHDF5Dataset(config['h5_file_path'], split, chunk_size=config['chunk_size'])

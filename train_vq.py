@@ -153,12 +153,13 @@ def train(model, args, train_loader, val_loader=None, max_train_epochs=1, alpha=
         pbar = tqdm(train_loader, desc=f"Epoch {epoch}")
         for batch in pbar:
             opt.zero_grad()
-            x = batch[KEY_LM_HIDDEN_STATES].to(device)
-            rec_loss, cmt_loss, total_loss, indices = compute_loss(model, x, alpha)
-            total_loss.backward()
-
-            opt.step()
-            active_percent = indices.unique().numel() / num_codes * 100
+            batch = batch[KEY_LM_HIDDEN_STATES].to(device)
+            for x in batch: # lock batch size to 1
+                x = x.unsqueeze(dim=0)
+                rec_loss, cmt_loss, total_loss, indices = compute_loss(model, x, alpha)
+                total_loss.backward()
+                opt.step()
+                active_percent = indices.unique().numel() / num_codes * 100
             pbar.set_postfix(
                 rec_loss=f"{rec_loss.item():.3f}",
                 cmt_loss=f"{cmt_loss.item():.3f}",
@@ -189,6 +190,12 @@ def train(model, args, train_loader, val_loader=None, max_train_epochs=1, alpha=
         save_checkpoint(model, opt, step, os.path.join(args.ckpt_dir, 'latest_checkpoint.pt'))
         if should_halt:
             break
+    val_loss = evaluate(model, val_loader, "Validation", writer, step)[KEY_EVAL_REC_LOSS]
+    if val_loss < best_val_loss:
+        best_val_loss = val_loss
+        best_epoch = epoch
+        no_improvement_counter = 0
+        save_checkpoint(model, opt, step, os.path.join(args.ckpt_dir, 'best_checkpoint.pt'))
     print(f'Stopped on {epoch=}')
     print(f'{best_epoch=}')
 
