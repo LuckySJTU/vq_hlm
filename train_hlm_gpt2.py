@@ -69,7 +69,7 @@ def configure_training(model, train_config, train_dataset, val_dataset):
 
 # 5. 训练模型
 def train_model(trainer):
-    trainer.train()
+    trainer.train(resume_from_checkpoint=trainer.args.resume_from_checkpoint)
     trainer.evaluate()
 
 # 6. 保存模型

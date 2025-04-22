@@ -8,6 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional, Tuple, Union
 import os
+from safetensors.torch import load_file
 
 
 class HLMGPT2Config(GPT2Config):
@@ -195,7 +196,7 @@ class HLMGPT2(GPT2PreTrainedModel, GenerationMixin):
     def load_checkpoint(model, ckpt_dir):
         assert isinstance(model, HLMGPT2)
         # load model.safetensors
-        model.load_state_dict(torch.load(os.path.join(ckpt_dir,'model.safetensors')))
+        model.load_state_dict(load_file(os.path.join(ckpt_dir,'model.safetensors')))
 
     def tie_weights(self):
         return
