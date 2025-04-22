@@ -15,7 +15,7 @@ import h5py
 import os
 
 
-SAVE_DIR = "/data1/yfliu/vqhlm/datasets/wikitext103_gpt2finetuned/"  # HARD CODED
+SAVE_DIR = "/data0/yxwang/Dataset/vqhlm/wikitext103_gpt2"  # HARD CODED
 logger = logging.get_logger(__name__)
 
 

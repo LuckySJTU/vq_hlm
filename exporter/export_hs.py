@@ -67,7 +67,7 @@ logger = logging.getLogger(__name__)
 
 MODEL_CONFIG_CLASSES = list(MODEL_FOR_CAUSAL_LM_MAPPING.keys())
 MODEL_TYPES = tuple(conf.model_type for conf in MODEL_CONFIG_CLASSES)
-PRETRAIN_PATH = "neulab/gpt2-finetuned-wikitext103"
+PRETRAIN_PATH = "/data1/public/hf/openai-community/gpt2"
 
 padding_index = -100
 
@@ -264,7 +264,7 @@ def main():
     if data_args.dataset_name is not None:
         # Downloading and loading a dataset from the hub.
         raw_datasets = load_dataset(
-            data_args.dataset_name, data_args.dataset_config_name, cache_dir=model_args.cache_dir
+            data_args.dataset_name, data_args.dataset_config_name, cache_dir=model_args.cache_dir, trust_remote_code=True
         )
         if "validation" not in raw_datasets.keys():
             raw_datasets["validation"] = load_dataset(
@@ -272,12 +272,14 @@ def main():
                 data_args.dataset_config_name,
                 split=f"train[:{data_args.validation_split_percentage}%]",
                 cache_dir=model_args.cache_dir,
+                trust_remote_code=True,
             )
             raw_datasets["train"] = load_dataset(
                 data_args.dataset_name,
                 data_args.dataset_config_name,
                 split=f"train[{data_args.validation_split_percentage}%:]",
                 cache_dir=model_args.cache_dir,
+                trust_remote_code=True,
             )
     else:
         data_files = {}
@@ -294,7 +296,7 @@ def main():
         if extension == "txt":
             extension = "text"
             dataset_args["keep_linebreaks"] = data_args.keep_linebreaks
-        raw_datasets = load_dataset(extension, data_files=data_files, cache_dir=model_args.cache_dir, **dataset_args)
+        raw_datasets = load_dataset(extension, data_files=data_files, cache_dir=model_args.cache_dir, trust_remote_code=True, **dataset_args)
         # If no validation data is there, validation_split_percentage will be used to divide the dataset.
         if "validation" not in raw_datasets.keys():
             raw_datasets["validation"] = load_dataset(
@@ -302,6 +304,7 @@ def main():
                 data_files=data_files,
                 split=f"train[:{data_args.validation_split_percentage}%]",
                 cache_dir=model_args.cache_dir,
+                trust_remote_code=True,
                 **dataset_args,
             )
             raw_datasets["train"] = load_dataset(
@@ -309,6 +312,7 @@ def main():
                 data_files=data_files,
                 split=f"train[{data_args.validation_split_percentage}%:]",
                 cache_dir=model_args.cache_dir,
+                trust_remote_code=True,
                 **dataset_args,
             )
 
